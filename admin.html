@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - E-Library</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; padding: 2em; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 2em; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #333; }
+        input, textarea { width: 100%; padding: 10px; margin-bottom: 1em; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { height: 120px; resize: vertical; }
+        button { padding: 10px; border: none; border-radius: 4px; color: white; font-size: 16px; cursor: pointer; }
+        .submit-btn { width: 100%; background-color: #28a745; }
+        #access-denied { text-align: center; color: red; font-size: 2em; display: none; }
+
+        /* Styles for the existing books list */
+        .book-list-item { display: flex; justify-content: space-between; align-items: center; padding: 1em; border-bottom: 1px solid #eee; }
+        .book-list-item:last-child { border-bottom: none; }
+        .book-title { font-weight: bold; }
+        .action-btn { margin-left: 10px; padding: 5px 10px; font-size: 14px; }
+        .edit-btn { background-color: #007bff; }
+        .delete-btn { background-color: #dc3545; }
+
+        /* Styles for the Edit Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 700px; border-radius: 8px; }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="access-denied">
+        <h1>Access Denied</h1>
+        <p>You must be an admin to view this page. Redirecting...</p>
+    </div>
+
+    <div id="admin-panel" style="display: none;">
+        <div class="container">
+            <h1>Add a New Book</h1>
+            <form id="add-book-form">
+                <input type="text" id="title" placeholder="Book Title" required>
+                <input type="text" id="author" placeholder="Author" required>
+                <textarea id="summary" placeholder="Book Summary" required></textarea>
+                <input type="url" id="coverImageURL" placeholder="Cover Image URL" required>
+                <input type="url" id="downloadURL" placeholder="Download URL (from GitHub)" required>
+                <textarea id="slideshowImages" placeholder="Slideshow Image URLs (one URL per line)"></textarea>
+                <button type="submit" class="submit-btn">Add Book to Library</button>
+            </form>
+        </div>
+
+        <div class="container" style="margin-top: 2em;">
+            <h2>Manage Existing Books</h2>
+            <div id="existing-books-list">
+                </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Edit Book</h2>
+            <form id="edit-book-form">
+                <input type="hidden" id="edit-book-id">
+                <input type="text" id="edit-title" placeholder="Book Title" required>
+                <input type="text" id="edit-author" placeholder="Author" required>
+                <textarea id="edit-summary" placeholder="Book Summary" required></textarea>
+                <input type="url" id="edit-coverImageURL" placeholder="Cover Image URL" required>
+                <input type="url" id="edit-downloadURL" placeholder="Download URL" required>
+                <textarea id="edit-slideshowImages" placeholder="Slideshow Image URLs (one URL per line)"></textarea>
+                <button type="submit" class="submit-btn">Save Changes</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyAVhiNBpgSktnjt6IbAQvMzwawDGCKtor8", // Make sure this has your NEWEST API key
+          authDomain: "simple-gcp-library.firebaseapp.com",
+          projectId: "simple-gcp-library",
+          storageBucket: "simple-gcp-library.firebasestorage.app",
+          messagingSenderId: "472432232905",
+          appId: "1:472432232905:web:d3fd1        97e028027ceb3c018",
+          measurementId: "G-CXSQEZ6KG0"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // --- PAGE PROTECTION & INITIALIZATION ---
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                db.collection('users').doc(user.uid).get().then(doc => {
+                    if (doc.exists && doc.data().role === 'admin') {
+                        document.getElementById('admin-panel').style.display = 'block';
+                        loadExistingBooks(); // Load books if user is admin
+                    } else {
+                        document.getElementById('access-denied').style.display = 'block';
+                        setTimeout(() => window.location.href = 'index.html', 3000);
+                    }
+                });
+            } else {
+                window.location.href = 'login.html';
+            }
+        });
+
+        // --- "ADD NEW BOOK" FORM LOGIC (same as before) ---
+        const addBookForm = document.getElementById('add-book-form');
+        addBookForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const slideshowImagesArray = document.getElementById('slideshowImages').value.split('\n').filter(url => url.trim() !== '');
+            db.collection('books').add({
+                title: document.getElementById('title').value,
+                author: document.getElementById('author').value,
+                summary: document.getElementById('summary').value,
+                coverImageURL: document.getElementById('coverImageURL').value,
+                downloadURL: document.getElementById('downloadURL').value,
+                slideshowImages: slideshowImagesArray
+            }).then(() => {
+                alert('Book successfully added!');
+                addBookForm.reset();
+                loadExistingBooks(); // Refresh the list
+            }).catch(error => alert('Error adding book: ' + error.message));
+        });
+
+        // --- NEW: "MANAGE EXISTING BOOKS" LOGIC ---
+        const existingBooksList = document.getElementById('existing-books-list');
+        const editModal = document.getElementById('edit-modal');
+        const editForm = document.getElementById('edit-book-form');
+        const closeModalBtn = document.querySelector('.close-btn');
+
+        // Function to load and display all books
+        async function loadExistingBooks() {
+            existingBooksList.innerHTML = 'Loading...';
+            const querySnapshot = await db.collection('books').get();
+            existingBooksList.innerHTML = '';
+            querySnapshot.forEach(doc => {
+                const book = doc.data();
+                const bookEl = document.createElement('div');
+                bookEl.classList.add('book-list-item');
+                bookEl.innerHTML = `
+                    <span class="book-title">${book.title}</span>
+                    <div>
+                        <button class="action-btn edit-btn" data-id="${doc.id}">Edit</button>
+                        <button class="action-btn delete-btn" data-id="${doc.id}">Delete</button>
+                    </div>
+                `;
+                existingBooksList.appendChild(bookEl);
+            });
+        }
+
+        // Handle clicks for Edit and Delete buttons
+        existingBooksList.addEventListener('click', e => {
+            const bookId = e.target.dataset.id;
+            if (e.target.classList.contains('delete-btn')) {
+                if (confirm('Are you sure you want to delete this book?')) {
+                    db.collection('books').doc(bookId).delete().then(() => {
+                        alert('Book deleted!');
+                        loadExistingBooks(); // Refresh the list
+                    });
+                }
+            } else if (e.target.classList.contains('edit-btn')) {
+                db.collection('books').doc(bookId).get().then(doc => {
+                    const book = doc.data();
+                    document.getElementById('edit-book-id').value = bookId;
+                    document.getElementById('edit-title').value = book.title;
+                    document.getElementById('edit-author').value = book.author;
+                    document.getElementById('edit-summary').value = book.summary;
+                    document.getElementById('edit-coverImageURL').value = book.coverImageURL;
+                    document.getElementById('edit-downloadURL').value = book.downloadURL;
+                    document.getElementById('edit-slideshowImages').value = book.slideshowImages.join('\n');
+                    editModal.style.display = 'block';
+                });
+            }
+        });
+
+        // Handle saving changes from the edit form
+        editForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const bookId = document.getElementById('edit-book-id').value;
+            const updatedSlideshowImages = document.getElementById('edit-slideshowImages').value.split('\n').filter(url => url.trim() !== '');
+            
+            db.collection('books').doc(bookId).update({
+                title: document.getElementById('edit-title').value,
+                author: document.getElementById('edit-author').value,
+                summary: document.getElementById('edit-summary').value,
+                coverImageURL: document.getElementById('edit-coverImageURL').value,
+                downloadURL: document.getElementById('edit-downloadURL').value,
+                slideshowImages: updatedSlideshowImages
+            }).then(() => {
+                alert('Book updated successfully!');
+                editModal.style.display = 'none';
+                loadExistingBooks(); // Refresh the list
+            });
+        });
+
+        // Close the modal
+        closeModalBtn.onclick = () => editModal.style.display = 'none';
+        window.onclick = e => {
+            if (e.target == editModal) {
+                editModal.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html>

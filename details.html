@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Book Details</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; margin: 0; padding: 2em; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 2em; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .slideshow { width: 100%; height: 400px; background-color: #eee; margin-bottom: 2em; border-radius: 8px; position: relative; overflow: hidden; }
+        .slideshow img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* This was changed from 'cover' */
+            position: absolute;
+            opacity: 0;
+            transition: opacity: 0.5s ease-in-out;
+        }
+        .slideshow img.visible { opacity: 1; }
+        h1 { color: #333; }
+        p { color: #555; line-height: 1.6; white-space: pre-wrap; }
+        .download-btn { display: inline-block; background-color: #28a745; color: white; padding: 0.8em 1.5em; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top: 1em; }
+        .download-btn:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="slideshow" class="slideshow">
+        </div>
+        <h1 id="book-title">Loading...</h1>
+        <p id="book-summary">Loading...</p>
+        <a id="download-link" href="#" class="download-btn">Download</a>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyAVhiNBpgSktnjt6IbAQvMzwawDGCKtor8", // Your newest API key
+          authDomain: "simple-gcp-library.firebaseapp.com",
+          projectId: "simple-gcp-library",
+          storageBucket: "simple-gcp-library.firebasestorage.app",
+          messagingSenderId: "472432232905",
+          appId: "1:472432232905:web:d3fd197e028027ceb3c018",
+          measurementId: "G-CXSQEZ6KG0"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                loadBookDetails();
+            } else {
+                window.location.href = 'login.html';
+            }
+        });
+
+        function loadBookDetails() {
+            const params = new URLSearchParams(window.location.search);
+            const bookId = params.get('id');
+
+            const titleEl = document.getElementById('book-title');
+            const summaryEl = document.getElementById('book-summary');
+            const downloadLinkEl = document.getElementById('download-link');
+            const slideshowEl = document.getElementById('slideshow');
+
+            if (bookId) {
+                db.collection("books").doc(bookId).get().then((doc) => {
+                    if (doc.exists) {
+                        const book = doc.data();
+                        titleEl.textContent = book.title;
+                        summaryEl.innerHTML = book.summary;
+                        downloadLinkEl.href = book.downloadURL;
+
+                        if (book.slideshowImages && book.slideshowImages.length > 0) {
+                            let currentImageIndex = 0;
+                            book.slideshowImages.forEach((url, index) => {
+                                const img = document.createElement('img');
+                                img.src = url;
+                                if (index === 0) img.classList.add('visible');
+                                slideshowEl.appendChild(img);
+                            });
+
+                            if (book.slideshowImages.length > 1) {
+                                setInterval(() => {
+                                    const images = slideshowEl.getElementsByTagName('img');
+                                    images[currentImageIndex].classList.remove('visible');
+                                    currentImageIndex = (currentImageIndex + 1) % images.length;
+                                    images[currentImageIndex].classList.add('visible');
+                                }, 4000);
+                            }
+                        }
+                    } else {
+                        titleEl.textContent = "Book not found";
+                    }
+                }).catch(error => {
+                    console.error("Error fetching document:", error);
+                    titleEl.textContent = "Error Loading Book";
+                    summaryEl.textContent = "Could not load data. See console for details.";
+                });
+            } else {
+                titleEl.textContent = "No Book Specified";
+            }
+        }
+    </script>
+</body>
+</html>
