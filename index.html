@@ -22,6 +22,15 @@
         .content-wrapper {
             padding: 2em;
         }
+        #search-bar {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 2em;
+            box-sizing: border-box; /* Ensures padding doesn't break layout */
+        }
         #book-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -86,9 +95,13 @@
     
     <div id="main-content" style="display: none;">
         <div class="content-wrapper">
-            <h1>My Simple E-Library</h1>
+            <h1>E-Library</h1>
+            
+            <input type="search" id="search-bar" placeholder="Search by title or author...">
+            
             <ul id="book-list">
-                </ul>
+                <!-- Books will be loaded here by JavaScript -->
+            </ul>
         </div>
     </div>
 
@@ -98,12 +111,13 @@
 
     <script>
         const firebaseConfig = {
-          apiKey: "AIzaSyAVhiNBpgSktnjt6IbAQvMzwawDGCKtor8", // Make sure this has your NEWEST API key
+          // MAKE SURE YOUR API KEY AND CONFIG ARE CORRECT
+          apiKey: "AIzaSyAVhiNBpgSktnjt6IbAQvMzwawDGCKtor8", 
           authDomain: "simple-gcp-library.firebaseapp.com",
           projectId: "simple-gcp-library",
           storageBucket: "simple-gcp-library.firebasestorage.app",
           messagingSenderId: "472432232905",
-          appId: "1:472432232905:web:d3fd1        97e028027ceb3c018",
+          appId: "1:472432232905:web:d3fd197e028027ceb3c018",
           measurementId: "G-CXSQEZ6KG0"
         };
 
@@ -112,31 +126,30 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
+        // --- NEW: Global variable to hold all books ---
+        let allBooks = [];
+
+        // --- Get element references ---
         const mainContent = document.getElementById('main-content');
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const adminBtn = document.getElementById('admin-btn');
+        const searchBar = document.getElementById('search-bar');
         
         auth.onAuthStateChanged(user => {
             if (user) {
-                // --- USER IS LOGGED IN ---
-                mainContent.style.display = 'block'; // Show the main content
+                mainContent.style.display = 'block';
                 loginBtn.style.display = 'none';
                 logoutBtn.style.display = 'inline';
                 
-                // Check if user is admin to show admin button
                 db.collection('users').doc(user.uid).get().then(doc => {
                     if (doc.exists && doc.data().role === 'admin') {
                         adminBtn.style.display = 'inline';
                     }
                 });
 
-                // Load the books since the user is logged in
-                loadBooks();
-
+                loadBooks(); // Load books now that user is logged in
             } else {
-                // --- USER IS NOT LOGGED IN ---
-                // Redirect them to the login page
                 window.location.href = 'login.html';
             }
         });
@@ -146,36 +159,67 @@
             auth.signOut();
         });
 
+        // --- UPDATED: LoadBooks function ---
+        // Now it fetches all books and stores them in our global array
         function loadBooks() {
             const bookList = document.getElementById('book-list');
             db.collection("books").get().then((querySnapshot) => {
-                bookList.innerHTML = ""; // Clear list before loading
+                allBooks = []; // Clear the array first
                 if (querySnapshot.empty) {
                     bookList.innerHTML = "<li>No books found.</li>";
                 }
                 querySnapshot.forEach((doc) => {
-                    const book = doc.data();
-                    const link = document.createElement('a');
-                    link.href = `details.html?id=${doc.id}`;
-                    link.style.textDecoration = 'none';
-
-                    const listItem = document.createElement('li');
-                    listItem.classList.add('book-card');
-                    listItem.innerHTML = `
-                        <img src="${book.coverImageURL}" alt="Cover of ${book.title}">
-                        <div class="book-info">
-                            <div>
-                                <h3>${book.title}</h3>
-                                <p>${book.author}</p>
-                            </div>
-                            <span class="download-btn">Details</span>
-                        </div>
-                    `;
-                    link.appendChild(listItem);
-                    bookList.appendChild(link);
+                    // Add the book data AND its ID to our array
+                    allBooks.push({ id: doc.id, ...doc.data() });
                 });
+                renderBooks(allBooks); // Render all books initially
             });
         }
+
+        // --- NEW: RenderBooks function ---
+        // This function displays any array of books we give it
+        function renderBooks(books) {
+            const bookList = document.getElementById('book-list');
+            bookList.innerHTML = ""; // Clear the list
+            
+            if (books.length === 0) {
+                 bookList.innerHTML = "<li>No matching books found.</li>";
+                 return;
+            }
+
+            books.forEach((book) => {
+                const link = document.createElement('a');
+                link.href = `details.html?id=${book.id}`;
+                link.style.textDecoration = 'none';
+
+                const listItem = document.createElement('li');
+                listItem.classList.add('book-card');
+                listItem.innerHTML = `
+                    <img src="${book.coverImageURL}" alt="Cover of ${book.title}">
+                    <div class="book-info">
+                        <div>
+                            <h3>${book.title}</h3>
+                            <p>${book.author}</p>
+                        </div>
+                        <span class="download-btn">Details</span>
+                    </div>
+                `;
+                link.appendChild(listItem);
+                bookList.appendChild(link);
+            });
+        }
+
+        // --- NEW: Search bar event listener ---
+        searchBar.addEventListener('keyup', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredBooks = allBooks.filter(book => {
+                return (
+                    book.title.toLowerCase().includes(searchTerm) ||
+                    book.author.toLowerCase().includes(searchTerm)
+                );
+            });
+            renderBooks(filteredBooks); // Re-render the list with only filtered books
+        });
     </script>
 
 </body>
