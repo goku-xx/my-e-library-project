@@ -19,6 +19,25 @@
             padding: 10px 20px;
             background: #eee;
         }
+        
+        /* --- NEW STYLES FOR HEADER BUTTONS --- */
+        #login-btn, #admin-btn, #logout-btn {
+            display: inline-block;
+            background-color: #007bff;
+            color: white !important;
+            padding: 8px 12px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        #login-btn:hover, #admin-btn:hover, #logout-btn:hover {
+            background-color: #0056b3;
+        }
+        /* --- END OF NEW STYLES --- */
+        
         .content-wrapper {
             padding: 2em;
         }
@@ -29,7 +48,7 @@
             border: 1px solid #ddd;
             border-radius: 8px;
             margin-bottom: 2em;
-            box-sizing: border-box; /* Ensures padding doesn't break layout */
+            box-sizing: border-box;
         }
         #book-list {
             display: grid;
@@ -89,19 +108,18 @@
 
     <div id="user-controls">
         <a href="login.html" id="login-btn" style="display: none;">Login</a>
-        <a href="admin.html" id="admin-btn" style="display: none; margin-right: 15px;">Admin Panel</a>
+        <a href="admin.html" id="admin-btn" style="display: none;">Admin Panel</a>
         <a href="#" id="logout-btn" style="display: none;">Logout</a>
     </div>
     
     <div id="main-content" style="display: none;">
         <div class="content-wrapper">
-            <h1>E-Library</h1>
+            <h1>My Simple E-Library</h1>
             
             <input type="search" id="search-bar" placeholder="Search by title or author...">
             
             <ul id="book-list">
-                <!-- Books will be loaded here by JavaScript -->
-            </ul>
+                </ul>
         </div>
     </div>
 
@@ -111,8 +129,8 @@
 
     <script>
         const firebaseConfig = {
-          // MAKE SURE YOUR API KEY AND CONFIG ARE CORRECT
-          apiKey: "AIzaSyAVhiNBpgSktnjt6IbAQvMzwawDGCKtor8", 
+          // YOUR API KEY AND CONFIG
+          apiKey: "AIzaSy...", 
           authDomain: "simple-gcp-library.firebaseapp.com",
           projectId: "simple-gcp-library",
           storageBucket: "simple-gcp-library.firebasestorage.app",
@@ -126,10 +144,8 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
-        // --- NEW: Global variable to hold all books ---
         let allBooks = [];
 
-        // --- Get element references ---
         const mainContent = document.getElementById('main-content');
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
@@ -148,7 +164,7 @@
                     }
                 });
 
-                loadBooks(); // Load books now that user is logged in
+                loadBooks();
             } else {
                 window.location.href = 'login.html';
             }
@@ -159,28 +175,23 @@
             auth.signOut();
         });
 
-        // --- UPDATED: LoadBooks function ---
-        // Now it fetches all books and stores them in our global array
         function loadBooks() {
             const bookList = document.getElementById('book-list');
             db.collection("books").get().then((querySnapshot) => {
-                allBooks = []; // Clear the array first
+                allBooks = [];
                 if (querySnapshot.empty) {
                     bookList.innerHTML = "<li>No books found.</li>";
                 }
                 querySnapshot.forEach((doc) => {
-                    // Add the book data AND its ID to our array
                     allBooks.push({ id: doc.id, ...doc.data() });
                 });
-                renderBooks(allBooks); // Render all books initially
+                renderBooks(allBooks);
             });
         }
 
-        // --- NEW: RenderBooks function ---
-        // This function displays any array of books we give it
         function renderBooks(books) {
             const bookList = document.getElementById('book-list');
-            bookList.innerHTML = ""; // Clear the list
+            bookList.innerHTML = "";
             
             if (books.length === 0) {
                  bookList.innerHTML = "<li>No matching books found.</li>";
@@ -209,7 +220,6 @@
             });
         }
 
-        // --- NEW: Search bar event listener ---
         searchBar.addEventListener('keyup', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             const filteredBooks = allBooks.filter(book => {
@@ -218,7 +228,7 @@
                     book.author.toLowerCase().includes(searchTerm)
                 );
             });
-            renderBooks(filteredBooks); // Re-render the list with only filtered books
+            renderBooks(filteredBooks);
         });
     </script>
 
